@@ -1,0 +1,41 @@
+{
+  "name": "create-nest-nuxt",
+  "version": "0.1.0",
+  "description": "Scaffold a NestJS + Nuxt monorepo — pick a variant and go",
+  "keywords": [
+    "nestjs",
+    "nuxt",
+    "monorepo",
+    "template",
+    "starter",
+    "typescript",
+    "docker"
+  ],
+  "license": "MIT",
+  "author": "Konstantin Ryazanov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CyberPunk10/create-nest-nuxt.git"
+  },
+  "homepage": "https://github.com/CyberPunk10/create-nest-nuxt#readme",
+  "bugs": "https://github.com/CyberPunk10/create-nest-nuxt/issues",
+  "type": "module",
+  "bin": {
+    "create-nest-nuxt": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "giget": "^3.3.1"
+  },
+  "packageManager": "pnpm@11.27.1"
+}

@@ -1,0 +1,28 @@
+# Зависимости
+node_modules
+
+# Логи
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Редакторы
+.idea
+.vscode
+*.swp
+*.swo
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+CLAUDE.md
+.claude
+.superpowers
+
+# Тестовые прогоны скаффолдера: он создаёт проекты в текущей папке,
+# и забытая копия иначе попадёт в коммит целиком.
+/tmp-*
+/test-*
