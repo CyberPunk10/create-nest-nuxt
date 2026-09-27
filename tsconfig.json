@@ -1,0 +1,21 @@
+{
+  // tsc здесь только проверяет типы: в разработке код запускает сам Node
+  // (`node src/index.ts`, типы просто стираются), для публикации собирает
+  // tsdown. Отсюда noEmit, импорты с расширением .ts и erasableSyntaxOnly —
+  // запрет конструкций, которые Node стереть не может (enum, namespace).
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "test", "tsdown.config.ts"]
+}

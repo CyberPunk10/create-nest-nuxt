@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  # Push — только в main. Для остальных веток прогон даёт PR-триггер:
+  # иначе на один и тот же код CI запускался бы дважды.
+  push:
+    branches: [main]
+  pull_request:
+
+# Новый push в ту же ветку делает предыдущий прогон бессмысленным.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      # Упавшая версия Node не должна скрывать результат другой.
+      fail-fast: false
+      matrix:
+        # Поддерживаемые LTS. Ниже 22 не опуститься: vitest и pnpm
+        # требуют Node 22+.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node ставится первым, чтобы pnpm работал на версии из матрицы,
+      # а не на системном Node раннера.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Версию pnpm берёт из packageManager в package.json.
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      # Собирает dist и гоняет тесты, включая запуск собранного CLI.
+      - run: pnpm test
