@@ -22,9 +22,7 @@ jobs:
       # Упавшая версия Node не должна скрывать результат другой.
       fail-fast: false
       matrix:
-        # Поддерживаемые LTS. Ниже 22 не опуститься: vitest и pnpm
-        # требуют Node 22+.
-        node: [22, 24]
+        node: [22, 24, 26]
     steps:
       - uses: actions/checkout@v7
 
@@ -41,5 +39,5 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      # Собирает dist и гоняет тесты, включая запуск собранного CLI.
+      # Сборку dist перед тестами делает test/build.ts.
       - run: pnpm test

@@ -4,15 +4,15 @@
  * @module
  */
 
-import { existsSync } from 'node:fs'
-import { readdir, rm } from 'node:fs/promises'
+import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spinner } from '@clack/prompts'
 import { downloadTemplate } from 'giget'
 import { UserError } from './errors.ts'
 import type { Messages } from './i18n.ts'
 import { personalize } from './personalize.ts'
-import type { OverwriteAction } from './prompts.ts'
+import { emptyDir, type OverwriteAction } from './target-dir.ts'
 import { TEMPLATE_REPO, type Variant } from './variants.ts'
 
 /** Что и куда разворачивать — ответы на вопросы. */
@@ -28,20 +28,16 @@ export interface ScaffoldOptions {
 }
 
 /**
- * Удаляет всё содержимое папки, кроме .git: человек мог развернуть проект в
- * склонированный репозиторий, и история с remote ему нужны.
- */
-async function emptyDir(dir: string): Promise<void> {
-  if (!existsSync(dir)) return
-  for (const entry of await readdir(dir)) {
-    if (entry === '.git') continue
-    await rm(join(dir, entry), { recursive: true, force: true })
-  }
-}
-
-/**
- * Скачивает шаблон в папку и персонализирует его.
- * @throws {UserError} Если скачать не удалось.
+ * Скачивает шаблон и переносит его в папку проекта.
+ *
+ * Шаблон сначала скачивается и персонализируется во временной папке, и
+ * только потом трогается папка проекта. Иначе при «Удалить файлы и
+ * продолжить» без сети человек остался бы без своих файлов и без проекта, а
+ * Ctrl+C посреди скачивания оставлял бы в ней недокачанный шаблон.
+ * Персонализация во временной папке заодно не трогает файлы человека при
+ * «Оставить файлы»: его собственный LICENSE остаётся на месте.
+ * @throws {UserError} Если скачать не удалось; папка проекта при этом не
+ *   меняется.
  */
 export async function scaffold(
   { dir, variant, packageName, overwrite }: ScaffoldOptions,
@@ -50,20 +46,24 @@ export async function scaffold(
   const s = spinner()
   s.start(messages.downloading)
 
-  if (overwrite === 'remove') await emptyDir(dir)
-
+  const staging = await mkdtemp(join(tmpdir(), 'create-nest-nuxt-'))
   try {
-    await downloadTemplate(`gh:${TEMPLATE_REPO}#${variant}`, {
-      dir,
-      force: true,
-    })
-  } catch (error) {
-    s.stop(messages.downloadFailed)
-    // Частый случай — нет сети или GitHub недоступен: сообщение giget
-    // понятнее любого нашего пересказа.
-    throw new UserError((error as Error).message, { cause: error })
+    try {
+      await downloadTemplate(`gh:${TEMPLATE_REPO}#${variant}`, { dir: staging, force: true })
+    } catch (error) {
+      s.stop(messages.downloadFailed)
+      // Частый случай — нет сети или GitHub недоступен: сообщение giget
+      // понятнее любого нашего пересказа.
+      throw new UserError(error instanceof Error ? error.message : String(error), { cause: error })
+    }
+
+    await personalize(staging, packageName)
+
+    if (overwrite === 'remove') await emptyDir(dir)
+    await cp(staging, dir, { recursive: true, force: true })
+  } finally {
+    await rm(staging, { recursive: true, force: true })
   }
 
-  await personalize(dir, packageName)
   s.stop(messages.ready)
 }

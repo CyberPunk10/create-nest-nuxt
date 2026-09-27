@@ -30,22 +30,28 @@ async function main(): Promise<void> {
   // Бросает UserError, если аргументы неверные.
   const args = readCliArgs(process.argv.slice(2))
 
-  if (args.help) return console.log(usage())
-  if (args.version) return console.log(pkg.version)
+  if (args.help) {
+    console.log(usage())
+    return
+  }
+  if (args.version) {
+    console.log(pkg.version)
+    return
+  }
 
   intro('create-nest-nuxt')
 
-  // Вопрос 1. «Language» — всегда, на английском
-  const locale = await askLocale()
+  // Вопрос 1. «Language» — на английском, пропускается, если передан --lang
+  const locale = await askLocale(args.lang)
   const messages = t(locale)
 
   // Вопрос 2. «Название проекта» — пропускается, если имя передано аргументом
   const target = await askProjectName(messages, args.name)
-  const dir = resolve(process.cwd(), target)
+  const dir = resolve(target)
 
   // Вопрос 3. «Папка … не пуста. Что сделать?» — только если в папке есть
-  // что-то кроме .git
-  const overwrite = await confirmOverwrite(dir, messages)
+  // что-то кроме .git и не передан --overwrite
+  const overwrite = await confirmOverwrite(dir, messages, args.overwrite)
 
   // Вопрос 4. «Имя пакета» — только если имя папки не годится для npm
   const packageName = await askPackageName(dir, messages)

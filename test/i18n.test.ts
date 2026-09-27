@@ -1,41 +1,32 @@
 import { describe, expect, test } from 'vitest'
-import { locales, type Messages, t } from '../src/i18n.ts'
+import { locales, t } from '../src/i18n.ts'
 import { getVariants, variantValues } from '../src/variants.ts'
 
-// Английский словарь — эталон. Если в другой язык забыли добавить
-// сообщение, CLI покажет вместо него undefined, и заметит это только тот,
-// кто выберет этот язык. Поэтому ключи каждого словаря сверяются с
-// английским.
-const reference = t('en')
-const others = locales.map(l => l.value).filter(v => v !== 'en')
-
-describe.each(others)('словарь %s', (locale) => {
-  const dict = t(locale)
-
-  test('набор ключей совпадает с английским', () => {
-    expect(Object.keys(dict).sort()).toEqual(Object.keys(reference).sort())
-  })
-
-  test('функции остаются функциями, строки — строками', () => {
-    for (const [key, value] of Object.entries(reference)) {
-      expect(typeof dict[key as keyof Messages], key).toBe(typeof value)
-    }
-  })
-
-  test('пояснение есть у каждого варианта', () => {
-    expect(Object.keys(dict.variantHints).sort()).toEqual(variantValues().sort())
-  })
-})
+// Что ключи и типы всех словарей совпадают с английским, проверяет tsc
+// (dict: Record<Locale, Messages>). Здесь — то, чего он не видит.
 
 test('английский словарь описывает каждый вариант', () => {
-  expect(Object.keys(reference.variantHints).sort()).toEqual(variantValues().sort())
+  // variantHints и список вариантов объявлены в разных местах, и tsc не
+  // связывает их между собой: новый вариант без пояснения он пропустит.
+  expect(Object.keys(t('en').variantHints).sort()).toEqual(variantValues().sort())
 })
 
-test('неизвестный язык откатывается на английский', () => {
-  expect(t('xx')).toBe(reference)
+describe.each(locales.map(l => l.value))('пояснения к вариантам: %s', (locale) => {
+  const hints = getVariants(locale).map(v => v.hint)
+
+  test('у каждого варианта своё непустое пояснение', () => {
+    expect(hints.every(hint => hint.trim() !== '')).toBe(true)
+    expect(new Set(hints).size).toBe(hints.length)
+  })
+
+  test.skipIf(locale === 'en')('переведены, а не скопированы с английского', () => {
+    const english = getVariants('en').map(v => v.hint)
+    expect(hints.filter((hint, i) => hint === english[i])).toEqual([])
+  })
 })
 
-test('getVariants подставляет пояснение на выбранном языке', () => {
-  const first = getVariants('ru')[0]!
-  expect(first.hint).toBe(t('ru').variantHints[first.value])
+describe('неизвестный язык откатывается на английский', () => {
+  test.each(['xx', '', 'toString', 'constructor', '__proto__'])('%j', (locale) => {
+    expect(t(locale)).toBe(t('en'))
+  })
 })

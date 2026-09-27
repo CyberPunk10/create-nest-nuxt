@@ -26,6 +26,7 @@ const en = {
   packageNameRequired: 'Enter a package name',
   variant: 'Which variant?',
   notEmpty: (dir: string) => `${dir} is not empty. What should we do?`,
+  notADirectory: (path: string) => `${path} is a file, not a folder`,
   overwriteCancel: 'Cancel',
   overwriteRemove: 'Remove existing files and continue',
   overwriteKeep: 'Keep existing files and continue',
@@ -38,6 +39,10 @@ const en = {
   unknownVariant: (value: string) => `Unknown variant: ${value}`,
   expectedOneOf: (list: string) => `Expected one of: ${list}`,
   unexpectedArgument: (value: string) => `Unexpected argument: ${value}`,
+  unknownLanguage: (value: string) => `Unknown language: ${value}`,
+  unknownOverwrite: (value: string) => `Unknown --overwrite value: ${value}`,
+  needsFlag: (flag: string) => `No terminal to ask in — pass ${flag}`,
+  noPackageName: (dir: string) => `Can't make a package name from "${dir}" — rename the folder`,
   oneProjectName: 'Only one project name is allowed, without spaces',
   variantHints: {
     'main': 'Base. No authentication, no database',
@@ -60,6 +65,7 @@ const dict: Record<Locale, Messages> = {
     packageNameRequired: 'Введите имя пакета',
     variant: 'Какой вариант?',
     notEmpty: dir => `Папка ${dir} не пуста. Что сделать?`,
+    notADirectory: path => `${path} — это файл, а не папка`,
     overwriteCancel: 'Отменить',
     overwriteRemove: 'Удалить файлы и продолжить',
     overwriteKeep: 'Оставить файлы и продолжить',
@@ -72,6 +78,10 @@ const dict: Record<Locale, Messages> = {
     unknownVariant: value => `Неизвестный вариант: ${value}`,
     expectedOneOf: list => `Ожидается один из: ${list}`,
     unexpectedArgument: value => `Лишний аргумент: ${value}`,
+    unknownLanguage: value => `Неизвестный язык: ${value}`,
+    unknownOverwrite: value => `Неизвестное значение --overwrite: ${value}`,
+    needsFlag: flag => `Спросить не получится — нет терминала. Передайте ${flag}`,
+    noPackageName: dir => `Из «${dir}» не получается имя пакета — переименуйте папку`,
     oneProjectName: 'Название проекта — одно и без пробелов',
     variantHints: {
       'main': 'Базовый вариант. Авторизация не реализована, БД отсутвует',
@@ -88,6 +98,7 @@ const dict: Record<Locale, Messages> = {
     packageNameRequired: 'กรุณาใส่ชื่อแพ็กเกจ',
     variant: 'เลือกตัวเลือกไหน?',
     notEmpty: dir => `โฟลเดอร์ ${dir} ไม่ว่าง จะทำอย่างไร?`,
+    notADirectory: path => `${path} เป็นไฟล์ ไม่ใช่โฟลเดอร์`,
     overwriteCancel: 'ยกเลิก',
     overwriteRemove: 'ลบไฟล์เดิมแล้วดำเนินการต่อ',
     overwriteKeep: 'เก็บไฟล์เดิมไว้แล้วดำเนินการต่อ',
@@ -100,6 +111,10 @@ const dict: Record<Locale, Messages> = {
     unknownVariant: value => `ไม่รู้จักตัวเลือก: ${value}`,
     expectedOneOf: list => `ต้องเป็นหนึ่งใน: ${list}`,
     unexpectedArgument: value => `อาร์กิวเมนต์เกิน: ${value}`,
+    unknownLanguage: value => `ไม่รู้จักภาษา: ${value}`,
+    unknownOverwrite: value => `ไม่รู้จักค่า --overwrite: ${value}`,
+    needsFlag: flag => `ถามไม่ได้เพราะไม่มีเทอร์มินัล ให้ระบุ ${flag}`,
+    noPackageName: dir => `สร้างชื่อแพ็กเกจจาก "${dir}" ไม่ได้ กรุณาเปลี่ยนชื่อโฟลเดอร์`,
     oneProjectName: 'ระบุชื่อโปรเจกต์ได้ชื่อเดียว และห้ามมีช่องว่าง',
     variantHints: {
       'main': 'พื้นฐาน ยังไม่มีระบบยืนยันตัวตนและฐานข้อมูล',
@@ -109,7 +124,16 @@ const dict: Record<Locale, Messages> = {
   },
 }
 
-/** Словарь выбранного языка; для неизвестного — английский. */
+/** Есть ли такой язык. */
+export function isLocale(value: string): value is Locale {
+  return locales.some(l => l.value === value)
+}
+
+/**
+ * Словарь выбранного языка; для неизвестного — английский. Object.hasOwn, а
+ * не просто индекс: у объекта есть унаследованные ключи вроде `toString`, и
+ * `dict['toString']` вернул бы функцию вместо словаря.
+ */
 export function t(locale: string): Messages {
-  return dict[locale as Locale] ?? dict.en
+  return Object.hasOwn(dict, locale) ? dict[locale as Locale] : dict.en
 }

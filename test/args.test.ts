@@ -80,3 +80,24 @@ describe('readCliArgs: ошибки — UserError', () => {
     expect(errorOf(['my app']).message).toBe(t('en').noSpaces)
   })
 })
+
+describe('readCliArgs: --lang и --overwrite', () => {
+  test('допустимые значения', () => {
+    expect(readCliArgs(['my-app', '--lang', 'th', '--overwrite=remove']))
+      .toEqual({ name: 'my-app', lang: 'th', overwrite: 'remove' })
+  })
+
+  test('неизвестный язык — с перечнем допустимых', () => {
+    expect(errorOf(['--lang', 'de']).message).toBe('Unknown language: de\nExpected one of: en, ru, th')
+  })
+
+  test('неизвестное действие для непустой папки', () => {
+    expect(errorOf(['--overwrite', 'merge']).message)
+      .toBe('Unknown --overwrite value: merge\nExpected one of: remove, keep')
+  })
+
+  test('справка перечисляет языки и действия', () => {
+    expect(usage()).toContain('en, ru, th')
+    expect(usage()).toContain('remove, keep')
+  })
+})

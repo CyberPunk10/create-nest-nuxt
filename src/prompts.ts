@@ -2,15 +2,16 @@
  * Вопросы пользователю. Порядок, в котором они задаются, — в main() в
  * index.ts; здесь только то, как выглядит и проверяется каждый.
  *
- * Каждый вопрос при отмене бросает {@link CancelledError}.
+ * Каждый вопрос при отмене бросает {@link CancelledError}. Если ответ передан
+ * аргументом, вопрос не задаётся; если спросить нельзя (нет терминала), а
+ * ответа в аргументах нет — {@link UserError} с подсказкой, какой флаг нужен.
  * @module
  */
 
-import { existsSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
 import { basename } from 'node:path'
+import process from 'node:process'
 import { isCancel, select, text } from '@clack/prompts'
-import { CancelledError } from './errors.ts'
+import { CancelledError, UserError } from './errors.ts'
 import { type Locale, locales, type Messages, t } from './i18n.ts'
 import {
   DEFAULT_PROJECT_NAME,
@@ -20,13 +21,21 @@ import {
   validatePackageName,
   validateProjectName,
 } from './project-name.ts'
-import { getVariants, type Variant } from './variants.ts'
+import { isEmptyDir, OVERWRITE_ACTIONS, type OverwriteAction } from './target-dir.ts'
+import { getVariants, type Variant, variantValues } from './variants.ts'
 
 /**
- * Что делать с содержимым непустой папки: `remove` — очистить перед
- * скачиванием (кроме .git), `keep` — распаковать шаблон поверх.
+ * Можно ли задавать вопросы. В CI, скриптах и при перенаправленном вводе
+ * stdin — не терминал: ответить некому, и clack ждал бы ответа вечно.
  */
-export type OverwriteAction = 'remove' | 'keep'
+function canAsk(): boolean {
+  return process.stdin.isTTY === true
+}
+
+/** Без терминала вопрос не задать — объясняем, каким флагом дать ответ. */
+function requireTerminal(messages: Messages, flag: string): void {
+  if (!canAsk()) throw new UserError(messages.needsFlag(flag))
+}
 
 /**
  * Отмена по Ctrl+C должна выходить молча, а не стектрейсом. Словарь
@@ -39,23 +48,14 @@ function assertNotCancelled<T>(value: T, messages: Messages): Exclude<T, symbol>
 }
 
 /**
- * Папка, где лежит только .git, считается пустой — как у create-vite. Это
- * частый сценарий: создал пустой репозиторий, склонировал, запустил
- * генератор с «.». Перезаписывать там нечего, спрашивать незачем.
- * @returns true и для несуществующей папки.
- */
-async function isEmptyDir(dir: string): Promise<boolean> {
-  if (!existsSync(dir)) return true
-  const entries = await readdir(dir)
-  return entries.every(entry => entry === '.git')
-}
-
-/**
- * Вопрос 1, «Language». На английском: язык ещё не выбран, а названия в
+ * Вопрос 1, «Language». Не задаётся, если передан `--lang`. На английском: язык ещё не выбран, а названия в
  * списке написаны каждое на своём — человек узнаёт себя по ним, а не по
  * тексту вопроса.
  */
-export async function askLocale(): Promise<Locale> {
+export async function askLocale(fromArgs?: Locale): Promise<Locale> {
+  if (fromArgs) return fromArgs
+  requireTerminal(t('en'), `--lang ${locales.map(l => l.value).join('|')}`)
+
   const value = await select({
     message: 'Language',
     options: [...locales],
@@ -71,6 +71,7 @@ export async function askLocale(): Promise<Locale> {
  */
 export async function askProjectName(messages: Messages, fromArgs?: string): Promise<string> {
   if (fromArgs) return fromArgs
+  requireTerminal(messages, '<project-name>')
 
   const value = await text({
     message: messages.projectName,
@@ -83,14 +84,21 @@ export async function askProjectName(messages: Messages, fromArgs?: string): Pro
 
 /**
  * Вопрос 3, «Папка не пуста». Задаётся, только если в папке уже что-то есть,
- * кроме .git. «Отменить» бросает {@link CancelledError}.
+ * кроме .git, и если не передан `--overwrite`. «Отменить» бросает
+ * {@link CancelledError}.
  *
  * Сама очистка — в scaffold, а не здесь: иначе отмена на следующем вопросе
  * оставила бы человека с уже удалёнными файлами.
  * @returns Для пустой папки — `keep`.
  */
-export async function confirmOverwrite(dir: string, messages: Messages): Promise<OverwriteAction> {
-  if (await isEmptyDir(dir)) return 'keep'
+export async function confirmOverwrite(
+  dir: string,
+  messages: Messages,
+  fromArgs?: OverwriteAction,
+): Promise<OverwriteAction> {
+  if (await isEmptyDir(dir, messages)) return 'keep'
+  if (fromArgs) return fromArgs
+  requireTerminal(messages, `--overwrite ${OVERWRITE_ACTIONS.join('|')}`)
 
   const action = assertNotCancelled(await select<OverwriteAction | 'cancel'>({
     message: messages.notEmpty(basename(dir)),
@@ -109,7 +117,7 @@ export async function confirmOverwrite(dir: string, messages: Messages): Promise
 /**
  * Вопрос 4, «Имя пакета». Задаётся, только если имя папки нельзя записать
  * в поле `name` package.json. В ответ по умолчанию подставлен исправленный
- * вариант.
+ * вариант; без терминала он и берётся.
  */
 export async function askPackageName(dir: string, messages: Messages): Promise<string> {
   const fromDir = packageNameFromDir(dir)
@@ -119,6 +127,11 @@ export async function askPackageName(dir: string, messages: Messages): Promise<s
   // на пустом поле молча принял бы негодное значение по умолчанию.
   const fixed = toPackageName(basename(dir))
   const fallback = isValidPackageName(fixed) ? fixed : undefined
+  if (!canAsk()) {
+    if (fallback) return fallback
+    throw new UserError(messages.noPackageName(basename(dir)))
+  }
+
   const value = await text({
     message: messages.packageName,
     placeholder: fallback,
@@ -135,6 +148,7 @@ export async function askPackageName(dir: string, messages: Messages): Promise<s
  */
 export async function askVariant(messages: Messages, locale: Locale, fromArgs?: Variant): Promise<Variant> {
   if (fromArgs) return fromArgs
+  requireTerminal(messages, `--variant ${variantValues().join('|')}`)
 
   const value = await select({
     message: messages.variant,
