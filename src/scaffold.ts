@@ -13,7 +13,7 @@ import { UserError } from './errors.ts'
 import type { Messages } from './i18n.ts'
 import { personalize } from './personalize.ts'
 import { emptyDir, type OverwriteAction } from './target-dir.ts'
-import { TEMPLATE_REPO, type Variant } from './variants.ts'
+import { TEMPLATE_REPO, templateRef, type Variant } from './variants.ts'
 
 /** Что и куда разворачивать — ответы на вопросы. */
 export interface ScaffoldOptions {
@@ -49,7 +49,7 @@ export async function scaffold(
   const staging = await mkdtemp(join(tmpdir(), 'create-nest-nuxt-'))
   try {
     try {
-      await downloadTemplate(`gh:${TEMPLATE_REPO}#${variant}`, { dir: staging, force: true })
+      await downloadTemplate(`gh:${TEMPLATE_REPO}#${templateRef(variant)}`, { dir: staging, force: true })
     } catch (error) {
       s.stop(messages.downloadFailed)
       // Частый случай — нет сети или GitHub недоступен: сообщение giget
