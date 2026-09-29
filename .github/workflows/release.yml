@@ -1,0 +1,61 @@
+name: Release
+
+# release-please читает conventional commits в main и держит открытым
+# Release PR: следующая версия + CHANGELOG. Мерж этого PR создаёт тег и
+# GitHub Release, а job publish публикует пакет в npm.
+on:
+  push:
+    branches: [main]
+
+# Два релиза подряд не должны публиковаться наперегонки — второй ждёт.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Trusted publishing: npm доверяет этому workflow по OIDC-токену
+      # GitHub, поэтому токен npm в секретах не нужен. Имя файла
+      # (release.yml) указано в настройках пакета на npmjs.com.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 24 — в нём npm 11.5.1+, без которого trusted publishing не
+      # работает.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      # Те же проверки, что в CI, на том коммите, который уходит в npm.
+      - run: pnpm test
+
+      # prepack сам собирает dist; provenance npm добавляет автоматически.
+      - run: npm publish --access public
