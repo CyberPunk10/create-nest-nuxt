@@ -73,6 +73,11 @@ describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
     expect(existsSync(join(dir, 'LICENSE'))).toBe(false)
   })
 
+  test('CI шаблона и тесты его скриптов удалены', () => {
+    expect(existsSync(join(dir, '.github'))).toBe(false)
+    expect(existsSync(join(dir, 'scripts/tests'))).toBe(false)
+  })
+
   test.each(Object.keys(MARKERS) as (keyof typeof MARKERS)[])('признаки «%s»', async (marker) => {
     const { dependency, file } = MARKERS[marker]
     const expected = has.includes(marker)

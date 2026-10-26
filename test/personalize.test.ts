@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
@@ -57,6 +57,20 @@ test('остальные поля не трогает', async () => {
 test('удаляет LICENSE шаблона', async () => {
   await personalize(dir, 'my-app')
   expect(existsSync(join(dir, 'LICENSE'))).toBe(false)
+})
+
+test('удаляет CI шаблона и тесты его скриптов', async () => {
+  await mkdir(join(dir, '.github/workflows'), { recursive: true })
+  await writeFile(join(dir, '.github/workflows/ci.yml'), 'name: CI\n')
+  await mkdir(join(dir, 'scripts/tests'), { recursive: true })
+  await writeFile(join(dir, 'scripts/tests/log.test.mjs'), '')
+  await writeFile(join(dir, 'scripts/dev.mjs'), '')
+
+  await personalize(dir, 'my-app')
+
+  expect(existsSync(join(dir, '.github'))).toBe(false)
+  expect(existsSync(join(dir, 'scripts/tests'))).toBe(false)
+  expect(existsSync(join(dir, 'scripts/dev.mjs'))).toBe(true)
 })
 
 test('сохраняет отступ исходного файла', async () => {

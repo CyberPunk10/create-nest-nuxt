@@ -15,10 +15,13 @@ import { join } from 'node:path'
 const TEMPLATE_FIELDS = ['author', 'license', 'keywords', 'description']
 
 /**
- * Файлы, которые принадлежат шаблону, а не проекту. LICENSE объявляет
- * правообладателем автора шаблона — в чужом проекте это неуместно.
+ * Что убираем из скачанного шаблона, чтобы разработчик получил чистый проект
+ * для старта, без служебных файлов самого шаблона:
+ * - LICENSE — лицензия автора шаблона, у проекта будет своя;
+ * - .github — CI, который проверяет ветки шаблона;
+ * - scripts/tests — тесты скриптов шаблона, их запускает только этот CI.
  */
-const TEMPLATE_FILES = ['LICENSE']
+const TEMPLATE_FILES = ['LICENSE', '.github', 'scripts/tests']
 
 /**
  * Удаляет лишние файлы шаблона, выставляет имя и версию `0.0.0` в корневом
@@ -28,7 +31,7 @@ const TEMPLATE_FILES = ['LICENSE']
  */
 export async function personalize(dir: string, projectName: string): Promise<void> {
   for (const file of TEMPLATE_FILES) {
-    await rm(join(dir, file), { force: true })
+    await rm(join(dir, file), { recursive: true, force: true })
   }
 
   const path = join(dir, 'package.json')
