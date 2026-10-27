@@ -2,10 +2,17 @@ name: Release
 
 # release-please читает conventional commits в main и держит открытым
 # Release PR: следующая версия + CHANGELOG. Мерж этого PR создаёт тег и
-# GitHub Release, а job publish публикует пакет в npm.
+# GitHub Release, а job publish отправляет пакет в npm на подтверждение.
 on:
   push:
     branches: [main]
+  # Повторная публикация уже созданного релиза — например, если publish
+  # упал после того, как release-please поставил тег.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег релиза, например v0.2.0
+        required: true
 
 # Два релиза подряд не должны публиковаться наперегонки — второй ждёт.
 concurrency:
@@ -17,6 +24,7 @@ permissions:
 
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30,7 +38,13 @@ jobs:
 
   publish:
     needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    # При ручном запуске release-please пропущен, поэтому без !cancelled()
+    # publish пропустился бы вслед за ним.
+    if: >-
+      !cancelled() && !failure() && (
+        needs.release-please.outputs.release_created == 'true'
+        || github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,9 +54,10 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.sha }}
 
-      # Node 24 — в нём npm 11.5.1+, без которого trusted publishing не
-      # работает.
+      # Node 24 — в нём npm 11.16+, где есть npm stage.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -57,5 +72,7 @@ jobs:
       # Те же проверки, что в CI, на том коммите, который уходит в npm.
       - run: pnpm test
 
-      # prepack сам собирает dist; provenance npm добавляет автоматически.
-      - run: npm publish --access public
+      # Версия уходит в npm на подтверждение, а не сразу пользователям:
+      # опубликует её мейнтейнер с 2FA — `npm stage approve` или на
+      # npmjs.com. prepack сам собирает dist.
+      - run: npm stage publish --access public --provenance
