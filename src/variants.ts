@@ -23,7 +23,7 @@ export const TEMPLATE_REPO = 'CyberPunk10/template-nest-nuxt'
  * Чтобы пользователи получили новый релиз шаблона, эту константу поднимают
  * и выпускают новую версию генератора.
  */
-export const TEMPLATE_VERSION = '0.1.0'
+export const TEMPLATE_VERSION = '0.1.1'
 
 /**
  * Что скачать для варианта: тег релиза (`auth-session@0.1.0`) или ветку

@@ -69,6 +69,14 @@ describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
     }
   })
 
+  // `nest new` записывает в package.json backend `"license": "UNLICENSED"` —
+  // «использовать запрещено», что противоречит лицензии самого проекта.
+  test('у backend нет полей автора и лицензии', async () => {
+    const backend = await readJson(join(dir, 'apps/backend/package.json'))
+    expect(backend).not.toHaveProperty('author')
+    expect(backend).not.toHaveProperty('license')
+  })
+
   test('LICENSE шаблона удалён', () => {
     expect(existsSync(join(dir, 'LICENSE'))).toBe(false)
   })
