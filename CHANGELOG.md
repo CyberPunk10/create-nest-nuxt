@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/CyberPunk10/create-nest-nuxt/compare/v0.2.0...v0.3.0) (2026-11-20)
+
+
+### Features
+
+* keep docs in the chosen language only ([fad058d](https://github.com/CyberPunk10/create-nest-nuxt/commit/fad058dccc4d579a392c1803c7f6ed229e9cdf0b))
+
 ## [0.2.0](https://github.com/CyberPunk10/create-nest-nuxt/compare/v0.1.0...v0.2.0) (2026-10-27)
 
 
