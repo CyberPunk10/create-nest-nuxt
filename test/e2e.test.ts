@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { downloadTemplate } from 'giget'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
+import type { Locale } from '../src/i18n.ts'
 import { TEMPLATE_REPO, templateRef, type Variant } from '../src/variants.ts'
 import { run } from './cli.ts'
 
@@ -25,10 +26,13 @@ const MARKERS = {
   prisma: { dependency: '@prisma/client', file: 'apps/backend/prisma/schema.prisma' },
 }
 
-const VARIANTS: { variant: Variant, has: (keyof typeof MARKERS)[] }[] = [
-  { variant: 'main', has: [] },
-  { variant: 'auth-session', has: ['auth'] },
-  { variant: 'postgres-prisma', has: ['auth', 'prisma'] },
+// Язык у каждого варианта свой, чтобы без лишних скачиваний проверить оба
+// случая: русская документация остаётся в корне, остальные переезжают туда
+// из подпапки.
+const VARIANTS: { variant: Variant, lang: Locale, has: (keyof typeof MARKERS)[] }[] = [
+  { variant: 'main', lang: 'ru', has: [] },
+  { variant: 'auth-session', lang: 'en', has: ['auth'] },
+  { variant: 'postgres-prisma', lang: 'th', has: ['auth', 'prisma'] },
 ]
 
 /**
@@ -70,7 +74,7 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
+describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, lang, has }) => {
   let dir: string
   let result: ReturnType<typeof run>
   /** Тот же шаблон, скачанный без генератора, — каким он был до чистки. */
@@ -80,7 +84,7 @@ describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
     const cwd = join(root, variant)
     await mkdir(cwd)
     dir = join(cwd, 'my-app')
-    result = run(['my-app', '--variant', variant, '--lang', 'en'], cwd)
+    result = run(['my-app', '--variant', variant, '--lang', lang], cwd)
 
     template = join(cwd, 'template')
     await downloadTemplate(`gh:${TEMPLATE_REPO}#${templateRef(variant)}`, { dir: template })
@@ -122,6 +126,17 @@ describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
 
   test.each(REMOVED)('удалён %s', (path) => {
     expect(existsSync(join(dir, path))).toBe(false)
+  })
+
+  test('документация только на выбранном языке и лежит в корне apps/docs', async () => {
+    const docs = join(dir, DOCS_LANGUAGES.ru)
+    const chosen = join(template, DOCS_LANGUAGES[lang])
+    expect(await readFile(join(docs, 'index.md'), 'utf8')).toBe(await readFile(join(chosen, 'index.md'), 'utf8'))
+    expect(await readdir(join(docs, 'guide'), { recursive: true }))
+      .toEqual(await readdir(join(chosen, 'guide'), { recursive: true }))
+    for (const other of ['en', 'th'] as const) {
+      expect(existsSync(join(dir, DOCS_LANGUAGES[other])), `папка ${other}`).toBe(false)
+    }
   })
 
   test.each(Object.keys(MARKERS) as (keyof typeof MARKERS)[])('признаки «%s»', async (marker) => {

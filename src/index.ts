@@ -60,7 +60,13 @@ async function main(): Promise<void> {
   const variant = await askVariant(messages, locale, args.variant)
 
   // Дальше вопросов нет: скачивание, персонализация, подсказка по запуску
-  await scaffold({ dir, variant, packageName, overwrite }, messages)
+  await scaffold({
+    dir,
+    variant,
+    packageName,
+    overwrite,
+    locale,
+  }, messages)
   showNextSteps(dir, target, messages)
 
   outro(messages.done)

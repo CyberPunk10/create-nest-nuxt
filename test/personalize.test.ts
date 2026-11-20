@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { personalize } from '../src/personalize.ts'
 
 // Фикстура повторяет то, что приходит из шаблона: корневой package.json с
@@ -33,14 +33,14 @@ async function readPackage(): Promise<Record<string, unknown>> {
 }
 
 test('выставляет имя и сбрасывает версию', async () => {
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
   const pkg = await readPackage()
   expect(pkg.name).toBe('my-app')
   expect(pkg.version).toBe('0.0.0')
 })
 
 test('убирает поля, описывающие шаблон', async () => {
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
   const pkg = await readPackage()
   for (const field of ['author', 'license', 'keywords', 'description']) {
     expect(pkg).not.toHaveProperty(field)
@@ -48,14 +48,14 @@ test('убирает поля, описывающие шаблон', async () =>
 })
 
 test('остальные поля не трогает', async () => {
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
   const pkg = await readPackage()
   expect(pkg.private).toBe(true)
   expect(pkg.scripts).toEqual({ dev: 'node scripts/dev.mjs' })
 })
 
 test('удаляет LICENSE шаблона', async () => {
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
   expect(existsSync(join(dir, 'LICENSE'))).toBe(false)
 })
 
@@ -66,7 +66,7 @@ test('удаляет CI шаблона и тесты его скриптов', a
   await writeFile(join(dir, 'scripts/tests/log.test.mjs'), '')
   await writeFile(join(dir, 'scripts/dev.mjs'), '')
 
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
 
   expect(existsSync(join(dir, '.github'))).toBe(false)
   expect(existsSync(join(dir, 'scripts/tests'))).toBe(false)
@@ -74,7 +74,7 @@ test('удаляет CI шаблона и тесты его скриптов', a
 })
 
 test('сохраняет отступ исходного файла', async () => {
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
   const raw = await readFile(join(dir, 'package.json'), 'utf8')
   expect(raw).toMatch(/^\{\n {4}"name"/)
   expect(raw.endsWith('}\n')).toBe(true)
@@ -82,7 +82,39 @@ test('сохраняет отступ исходного файла', async () =
 
 test('сохраняет отступ табами', async () => {
   await writeFile(join(dir, 'package.json'), '{\n\t"name": "x",\n\t"version": "1.0.0"\n}\n')
-  await personalize(dir, 'my-app')
+  await personalize(dir, 'my-app', 'ru')
   const raw = await readFile(join(dir, 'package.json'), 'utf8')
   expect(raw).toBe('{\n\t"name": "my-app",\n\t"version": "0.0.0"\n}\n')
+})
+
+describe('документация на одном языке', () => {
+  // Как в шаблоне: русская в корне apps/docs, остальные — в подпапках.
+  beforeEach(async () => {
+    for (const [folder, text] of [['', 'ru'], ['en', 'en'], ['th', 'th']] as const) {
+      const docs = join(dir, 'apps/docs', folder)
+      await mkdir(join(docs, 'guide'), { recursive: true })
+      await writeFile(join(docs, 'index.md'), `# ${text}\n`)
+      await writeFile(join(docs, 'guide/setup.md'), `${text} setup\n`)
+    }
+  })
+
+  async function readDocs(file: string): Promise<string> {
+    return readFile(join(dir, 'apps/docs', file), 'utf8')
+  }
+
+  test('русская остаётся в корне, подпапки остальных языков удалены', async () => {
+    await personalize(dir, 'my-app', 'ru')
+    expect(await readDocs('index.md')).toBe('# ru\n')
+    expect(await readDocs('guide/setup.md')).toBe('ru setup\n')
+    expect(existsSync(join(dir, 'apps/docs/en'))).toBe(false)
+    expect(existsSync(join(dir, 'apps/docs/th'))).toBe(false)
+  })
+
+  test('выбранный язык переезжает из подпапки в корень вместо русского', async () => {
+    await personalize(dir, 'my-app', 'en')
+    expect(await readDocs('index.md')).toBe('# en\n')
+    expect(await readDocs('guide/setup.md')).toBe('en setup\n')
+    expect(existsSync(join(dir, 'apps/docs/en'))).toBe(false)
+    expect(existsSync(join(dir, 'apps/docs/th'))).toBe(false)
+  })
 })

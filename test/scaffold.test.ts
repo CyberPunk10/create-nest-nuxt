@@ -54,7 +54,13 @@ async function read(file: string): Promise<string> {
 describe('скачивание не удалось', () => {
   test.each(['remove', 'keep'] as const)('папка человека не меняется: %s', async (overwrite) => {
     giget.offline = true
-    await expect(scaffold({ dir, variant: 'main', packageName: 'my-app', overwrite }, messages))
+    await expect(scaffold({
+      dir,
+      variant: 'main',
+      packageName: 'my-app',
+      locale: 'ru',
+      overwrite,
+    }, messages))
       .rejects.toThrow(UserError)
     expect((await readdir(dir)).sort()).toEqual(['.git', 'LICENSE', 'notes.txt'])
     expect(await read('notes.txt')).toBe('my work')
@@ -63,7 +69,13 @@ describe('скачивание не удалось', () => {
 
 describe('«Удалить файлы и продолжить»', () => {
   test('остаётся только шаблон и .git', async () => {
-    await scaffold({ dir, variant: 'main', packageName: 'my-app', overwrite: 'remove' }, messages)
+    await scaffold({
+      dir,
+      variant: 'main',
+      packageName: 'my-app',
+      locale: 'ru',
+      overwrite: 'remove',
+    }, messages)
     expect((await readdir(dir)).sort()).toEqual(['.git', 'README.md', 'package.json'])
   })
 })
@@ -71,24 +83,48 @@ describe('«Удалить файлы и продолжить»', () => {
 describe('«Оставить файлы и продолжить»', () => {
   test('файлы человека на месте, совпадающие заменены шаблоном', async () => {
     await writeFile(join(dir, 'README.md'), 'my readme')
-    await scaffold({ dir, variant: 'main', packageName: 'my-app', overwrite: 'keep' }, messages)
+    await scaffold({
+      dir,
+      variant: 'main',
+      packageName: 'my-app',
+      locale: 'ru',
+      overwrite: 'keep',
+    }, messages)
     expect(await read('notes.txt')).toBe('my work')
     expect(await read('README.md')).toBe('template readme')
   })
 
   test('свой LICENSE человека не удаляется — удаляется только LICENSE шаблона', async () => {
-    await scaffold({ dir, variant: 'main', packageName: 'my-app', overwrite: 'keep' }, messages)
+    await scaffold({
+      dir,
+      variant: 'main',
+      packageName: 'my-app',
+      locale: 'ru',
+      overwrite: 'keep',
+    }, messages)
     expect(await read('LICENSE')).toBe('my license')
   })
 })
 
 test('шаблон персонализирован', async () => {
-  await scaffold({ dir, variant: 'main', packageName: 'my-app', overwrite: 'remove' }, messages)
+  await scaffold({
+    dir,
+    variant: 'main',
+    packageName: 'my-app',
+    locale: 'ru',
+    overwrite: 'remove',
+  }, messages)
   expect(JSON.parse(await read('package.json'))).toEqual({ name: 'my-app', version: '0.0.0' })
 })
 
 test('несуществующая папка создаётся', async () => {
   const fresh = join(root, 'nested', 'fresh-app')
-  await scaffold({ dir: fresh, variant: 'main', packageName: 'fresh-app', overwrite: 'keep' }, messages)
+  await scaffold({
+    dir: fresh,
+    variant: 'main',
+    packageName: 'fresh-app',
+    locale: 'ru',
+    overwrite: 'keep',
+  }, messages)
   expect((await readdir(fresh)).sort()).toEqual(['README.md', 'package.json'])
 })

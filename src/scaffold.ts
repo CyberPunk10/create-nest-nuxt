@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { spinner } from '@clack/prompts'
 import { downloadTemplate } from 'giget'
 import { UserError } from './errors.ts'
-import type { Messages } from './i18n.ts'
+import type { Locale, Messages } from './i18n.ts'
 import { personalize } from './personalize.ts'
 import { emptyDir, type OverwriteAction } from './target-dir.ts'
 import { TEMPLATE_REPO, templateRef, type Variant } from './variants.ts'
@@ -25,6 +25,8 @@ export interface ScaffoldOptions {
   packageName: string
   /** Ответ на вопрос о непустой папке. */
   overwrite: OverwriteAction
+  /** Язык, на котором остаётся документация. */
+  locale: Locale
 }
 
 /**
@@ -40,7 +42,13 @@ export interface ScaffoldOptions {
  *   меняется.
  */
 export async function scaffold(
-  { dir, variant, packageName, overwrite }: ScaffoldOptions,
+  {
+    dir,
+    variant,
+    packageName,
+    overwrite,
+    locale,
+  }: ScaffoldOptions,
   messages: Messages,
 ): Promise<void> {
   const s = spinner()
@@ -57,7 +65,7 @@ export async function scaffold(
       throw new UserError(error instanceof Error ? error.message : String(error), { cause: error })
     }
 
-    await personalize(staging, packageName)
+    await personalize(staging, packageName, locale)
 
     if (overwrite === 'remove') await emptyDir(dir)
     await cp(staging, dir, { recursive: true, force: true })
