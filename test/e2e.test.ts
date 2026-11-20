@@ -2,8 +2,9 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { downloadTemplate } from 'giget'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { Variant } from '../src/variants.ts'
+import { TEMPLATE_REPO, templateRef, type Variant } from '../src/variants.ts'
 import { run } from './cli.ts'
 
 // Полный проход: собранный CLI с ответами в аргументах скачивает настоящий
@@ -30,6 +31,31 @@ const VARIANTS: { variant: Variant, has: (keyof typeof MARKERS)[] }[] = [
   { variant: 'postgres-prisma', has: ['auth', 'prisma'] },
 ]
 
+/**
+ * Что генератор вычищает из шаблона. Проверка «в проекте этого нет» сама по
+ * себе зелёная и тогда, когда шаблон переименовал файл, а генератор ничего не
+ * удалил. Поэтому каждый путь проверяется дважды: в скачанном шаблоне он
+ * есть, в проекте — нет.
+ */
+const REMOVED = [
+  'LICENSE',
+  '.github',
+  'scripts/tests',
+]
+
+/**
+ * Папки языков документации в шаблоне: русский лежит в корне `apps/docs`,
+ * остальные — в подпапках. В проекте остаётся один язык, и он всегда в корне.
+ */
+const DOCS_LANGUAGES = {
+  ru: 'apps/docs',
+  en: 'apps/docs/en',
+  th: 'apps/docs/th',
+}
+
+/** Страницы, из которых состоит документация на одном языке. */
+const DOCS_PAGES = ['index.md', 'guide']
+
 async function readJson(path: string): Promise<Record<string, any>> {
   return JSON.parse(await readFile(path, 'utf8'))
 }
@@ -47,13 +73,30 @@ afterAll(async () => {
 describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
   let dir: string
   let result: ReturnType<typeof run>
+  /** Тот же шаблон, скачанный без генератора, — каким он был до чистки. */
+  let template: string
 
   beforeAll(async () => {
     const cwd = join(root, variant)
     await mkdir(cwd)
     dir = join(cwd, 'my-app')
     result = run(['my-app', '--variant', variant, '--lang', 'en'], cwd)
+
+    template = join(cwd, 'template')
+    await downloadTemplate(`gh:${TEMPLATE_REPO}#${templateRef(variant)}`, { dir: template })
   }, DOWNLOAD_TIMEOUT)
+
+  describe('шаблон до чистки', () => {
+    test.each(REMOVED)('есть %s', (path) => {
+      expect(existsSync(join(template, path))).toBe(true)
+    })
+
+    test.each(Object.entries(DOCS_LANGUAGES))('есть документация на языке %s', (_, folder) => {
+      for (const page of DOCS_PAGES) {
+        expect(existsSync(join(template, folder, page)), page).toBe(true)
+      }
+    })
+  })
 
   test('завершается успешно и подсказывает cd в папку проекта', () => {
     expect(result.stderr).toBe('')
@@ -77,13 +120,8 @@ describe.each(VARIANTS)('вариант $variant', ({ variant, has }) => {
     expect(backend).not.toHaveProperty('license')
   })
 
-  test('LICENSE шаблона удалён', () => {
-    expect(existsSync(join(dir, 'LICENSE'))).toBe(false)
-  })
-
-  test('CI шаблона и тесты его скриптов удалены', () => {
-    expect(existsSync(join(dir, '.github'))).toBe(false)
-    expect(existsSync(join(dir, 'scripts/tests'))).toBe(false)
+  test.each(REMOVED)('удалён %s', (path) => {
+    expect(existsSync(join(dir, path))).toBe(false)
   })
 
   test.each(Object.keys(MARKERS) as (keyof typeof MARKERS)[])('признаки «%s»', async (marker) => {
