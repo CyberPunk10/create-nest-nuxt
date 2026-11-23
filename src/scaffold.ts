@@ -11,7 +11,7 @@ import { spinner } from '@clack/prompts'
 import { downloadTemplate } from 'giget'
 import { UserError } from './errors.ts'
 import type { Locale, Messages } from './i18n.ts'
-import { personalize } from './personalize.ts'
+import { personalize } from './personalize/index.ts'
 import { emptyDir, type OverwriteAction } from './target-dir.ts'
 import { TEMPLATE_REPO, templateRef, type Variant } from './variants.ts'
 

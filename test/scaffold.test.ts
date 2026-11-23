@@ -19,6 +19,8 @@ vi.mock('giget', () => ({
     await writeFile(join(dir, 'package.json'), '{\n  "name": "template-nest-nuxt",\n  "license": "MIT"\n}\n')
     await writeFile(join(dir, 'LICENSE'), 'template license')
     await writeFile(join(dir, 'README.md'), 'template readme')
+    const { writeDocs } = await import('./personalize/docs-fixture.ts')
+    await writeDocs(dir)
     return { dir }
   },
 }))
@@ -76,7 +78,7 @@ describe('«Удалить файлы и продолжить»', () => {
       locale: 'ru',
       overwrite: 'remove',
     }, messages)
-    expect((await readdir(dir)).sort()).toEqual(['.git', 'README.md', 'package.json'])
+    expect((await readdir(dir)).sort()).toEqual(['.git', 'README.md', 'apps', 'package.json'])
   })
 })
 
@@ -126,5 +128,5 @@ test('несуществующая папка создаётся', async () => {
     locale: 'ru',
     overwrite: 'keep',
   }, messages)
-  expect((await readdir(fresh)).sort()).toEqual(['README.md', 'package.json'])
+  expect((await readdir(fresh)).sort()).toEqual(['README.md', 'apps', 'package.json'])
 })

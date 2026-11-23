@@ -60,6 +60,13 @@ const DOCS_LANGUAGES = {
 /** Страницы, из которых состоит документация на одном языке. */
 const DOCS_PAGES = ['index.md', 'guide']
 
+/** Конфиг VitePress и файлы языка в нём. */
+const VITEPRESS = 'apps/docs/.vitepress'
+const languageFiles = (code: string) => [`config/${code}.ts`, `locales/${code}.json`]
+
+/** Строка со списком языков в config.ts. */
+const localesLine = (codes: string) => `const LOCALES: LocaleEntry[] = [${codes}]`
+
 async function readJson(path: string): Promise<Record<string, any>> {
   return JSON.parse(await readFile(path, 'utf8'))
 }
@@ -95,10 +102,19 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
       expect(existsSync(join(template, path))).toBe(true)
     })
 
-    test.each(Object.entries(DOCS_LANGUAGES))('есть документация на языке %s', (_, folder) => {
+    test.each(Object.entries(DOCS_LANGUAGES))('есть документация на языке %s', (code, folder) => {
       for (const page of DOCS_PAGES) {
         expect(existsSync(join(template, folder, page)), page).toBe(true)
       }
+      for (const file of languageFiles(code)) {
+        expect(existsSync(join(template, VITEPRESS, file)), file).toBe(true)
+      }
+    })
+
+    test('в конфиге документации перечислены все языки', async () => {
+      const config = await readFile(join(template, VITEPRESS, 'config.ts'), 'utf8')
+      expect(config).toContain(localesLine('ru, en, th'))
+      expect(await readFile(join(template, VITEPRESS, 'config/en.ts'), 'utf8')).toContain(`key: 'en'`)
     })
   })
 
@@ -136,6 +152,24 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
       .toEqual(await readdir(join(chosen, 'guide'), { recursive: true }))
     for (const other of ['en', 'th'] as const) {
       expect(existsSync(join(dir, DOCS_LANGUAGES[other])), `папка ${other}`).toBe(false)
+    }
+  })
+
+  test('в конфиге документации только выбранный язык, и он корневой', async () => {
+    const vitepress = join(dir, VITEPRESS)
+    const config = await readFile(join(vitepress, 'config.ts'), 'utf8')
+    expect(config).toContain(localesLine(lang))
+    expect(config).toContain(`'./locales/${lang}.json'`)
+
+    const own = await readFile(join(vitepress, `config/${lang}.ts`), 'utf8')
+    expect(own).toContain(`key: 'root'`)
+    expect(own).not.toContain(`'/${lang}/`)
+
+    for (const other of Object.keys(DOCS_LANGUAGES).filter(code => code !== lang)) {
+      expect(config, `импорт ${other}`).not.toContain(`./config/${other}'`)
+      for (const file of languageFiles(other)) {
+        expect(existsSync(join(vitepress, file)), file).toBe(false)
+      }
     }
   })
 
