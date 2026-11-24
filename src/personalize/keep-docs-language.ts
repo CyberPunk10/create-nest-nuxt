@@ -1,4 +1,4 @@
-import { rename, rm } from 'node:fs/promises'
+import { readdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { type Locale, locales } from '../i18n.ts'
 import { editFile, removeOnce, replaceLinks, replaceOnce } from './edit-text.ts'
@@ -10,7 +10,10 @@ import { editFile, removeOnce, replaceLinks, replaceOnce } from './edit-text.ts'
 const DOCS = 'apps/docs'
 const DOCS_ROOT_LOCALE: Locale = 'ru'
 
-/** Страницы, из которых состоит документация на одном языке. */
+/**
+ * Страницы, из которых состоит документация на одном языке. Ровно это лежит
+ * в папке каждого языка; в корне — то же самое плюс служебные файлы.
+ */
 const DOCS_PAGES = ['index.md', 'guide']
 
 /**
@@ -28,6 +31,18 @@ export async function keepDocsLanguage(dir: string, locale: Locale): Promise<voi
   const docs = join(dir, DOCS)
   const vitepress = join(docs, '.vitepress')
   const others = locales.map(l => l.value).filter(value => value !== locale)
+
+  // 0. Сверка до любых правок: в папке каждого языка ровно DOCS_PAGES.
+  // Если шаблон добавит страницу (например en/faq.md), шаг 4 её не перенесёт,
+  // а шаг 5 удалит вместе с папкой. Поэтому генератор падает, и список
+  // нужно обновить вручную.
+  for (const { value } of locales) {
+    if (value === DOCS_ROOT_LOCALE) continue
+    const pages = (await readdir(join(docs, value))).sort()
+    if (pages.join() !== [...DOCS_PAGES].sort().join()) {
+      throw new Error(`Template mismatch: ${DOCS}/${value} has ${pages.join(', ')}, expected ${DOCS_PAGES.join(', ')}`)
+    }
+  }
 
   // 1. config.ts — общий конфиг, языки перечислены в нём. Пример для en:
   //   import ru from './config/ru'                  → строка удалена

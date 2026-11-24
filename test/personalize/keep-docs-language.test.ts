@@ -85,3 +85,11 @@ test('падает, если в шаблоне не нашлась строка,
   await writeFile(join(dir, 'apps/docs/.vitepress/config.ts'), `const LANGS = [ru, en, th]\n`)
   await expect(keepDocsLanguage(dir, 'en')).rejects.toThrow('Template mismatch')
 })
+
+test('падает до любых правок, если в папке языка есть страница вне списка', async () => {
+  await writeFile(join(dir, 'apps/docs/th/faq.md'), '# faq\n')
+  await expect(keepDocsLanguage(dir, 'en')).rejects.toThrow('apps/docs/th has faq.md, guide, index.md')
+  // Ничего не тронуто: конфиг и папки языков на месте.
+  expect(await readDocs('.vitepress/config.ts')).toContain('[ru, en, th]')
+  expect(existsSync(join(dir, 'apps/docs/en'))).toBe(true)
+})
