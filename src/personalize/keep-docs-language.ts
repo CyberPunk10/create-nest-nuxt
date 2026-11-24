@@ -27,7 +27,7 @@ export async function keepDocsLanguage(dir: string, locale: Locale): Promise<voi
   // удаляются, — все, кроме выбранного (например для en: ru и th).
   const docs = join(dir, DOCS)
   const vitepress = join(docs, '.vitepress')
-  const others =locales.map(l => l.value).filter(value => value !== locale)
+  const others = locales.map(l => l.value).filter(value => value !== locale)
 
   // 1. config.ts — общий конфиг, языки перечислены в нём. Пример для en:
   //   import ru from './config/ru'                  → строка удалена

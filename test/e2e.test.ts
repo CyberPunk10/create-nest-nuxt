@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -147,9 +147,14 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
   test('документация только на выбранном языке и лежит в корне apps/docs', async () => {
     const docs = join(dir, DOCS_LANGUAGES.ru)
     const chosen = join(template, DOCS_LANGUAGES[lang])
-    expect(await readFile(join(docs, 'index.md'), 'utf8')).toBe(await readFile(join(chosen, 'index.md'), 'utf8'))
-    expect(await readdir(join(docs, 'guide'), { recursive: true }))
-      .toEqual(await readdir(join(chosen, 'guide'), { recursive: true }))
+    // Набор страниц тот же, и каждая страница совпадает с шаблоном побайтно:
+    // так видно, что в корне именно выбранный язык, а не остатки русского.
+    const pages = await readdir(join(chosen, 'guide'), { recursive: true })
+    expect(await readdir(join(docs, 'guide'), { recursive: true })).toEqual(pages)
+    for (const page of ['index.md', ...pages.map(path => join('guide', path))]) {
+      if (!statSync(join(chosen, page)).isFile()) continue
+      expect(await readFile(join(docs, page), 'utf8'), page).toBe(await readFile(join(chosen, page), 'utf8'))
+    }
     for (const other of ['en', 'th'] as const) {
       expect(existsSync(join(dir, DOCS_LANGUAGES[other])), `папка ${other}`).toBe(false)
     }
