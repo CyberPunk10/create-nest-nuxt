@@ -19,8 +19,9 @@ vi.mock('giget', () => ({
     await writeFile(join(dir, 'package.json'), '{\n  "name": "template-nest-nuxt",\n  "license": "MIT"\n}\n')
     await writeFile(join(dir, 'LICENSE'), 'template license')
     await writeFile(join(dir, 'README.md'), 'template readme')
-    const { writeDocs } = await import('./personalize/docs-fixture.ts')
+    const { writeDocs, writeMaintainerDocs } = await import('./personalize/docs-fixture.ts')
     await writeDocs(dir)
+    await writeMaintainerDocs(dir)
     return { dir }
   },
 }))

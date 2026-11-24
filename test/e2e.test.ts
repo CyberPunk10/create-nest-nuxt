@@ -41,10 +41,13 @@ const VARIANTS: { variant: Variant, lang: Locale, has: (keyof typeof MARKERS)[] 
  * удалил. Поэтому каждый путь проверяется дважды: в скачанном шаблоне он
  * есть, в проекте — нет.
  */
+const REMOVED_MAINTAINER = 'apps/docs/guide/maintainer'
+
 const REMOVED = [
   'LICENSE',
   '.github',
   'scripts/tests',
+  REMOVED_MAINTAINER,
 ]
 
 /**
@@ -116,6 +119,10 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
       expect(config).toContain(localesLine('ru, en, th'))
       expect(await readFile(join(template, VITEPRESS, 'config/en.ts'), 'utf8')).toContain(`key: 'en'`)
     })
+
+    test('в сайдбаре русской документации есть раздел для мейнтейнера', async () => {
+      expect(await readFile(join(template, VITEPRESS, 'config/ru.ts'), 'utf8')).toContain('/guide/maintainer/')
+    })
   })
 
   test('завершается успешно и подсказывает cd в папку проекта', () => {
@@ -149,7 +156,10 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
     const chosen = join(template, DOCS_LANGUAGES[lang])
     // Набор страниц тот же, и каждая страница совпадает с шаблоном побайтно:
     // так видно, что в корне именно выбранный язык, а не остатки русского.
-    const pages = await readdir(join(chosen, 'guide'), { recursive: true })
+    // Раздел для мейнтейнера есть только в русском шаблоне и удаляется
+    // отдельно — его отсутствие проверяет «удалён …».
+    const pages = (await readdir(join(chosen, 'guide'), { recursive: true }))
+      .filter(path => !join(DOCS_LANGUAGES.ru, 'guide', path).startsWith(REMOVED_MAINTAINER))
     expect(await readdir(join(docs, 'guide'), { recursive: true })).toEqual(pages)
     for (const page of ['index.md', ...pages.map(path => join('guide', path))]) {
       if (!statSync(join(chosen, page)).isFile()) continue
@@ -169,6 +179,7 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
     const own = await readFile(join(vitepress, `config/${lang}.ts`), 'utf8')
     expect(own).toContain(`key: 'root'`)
     expect(own).not.toContain(`'/${lang}/`)
+    expect(own, 'раздел для мейнтейнера').not.toContain('/guide/maintainer')
 
     for (const other of Object.keys(DOCS_LANGUAGES).filter(code => code !== lang)) {
       expect(config, `импорт ${other}`).not.toContain(`./config/${other}'`)

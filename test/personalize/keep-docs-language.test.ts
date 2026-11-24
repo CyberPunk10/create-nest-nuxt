@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
@@ -86,10 +86,16 @@ test('падает, если в шаблоне не нашлась строка,
   await expect(keepDocsLanguage(dir, 'en')).rejects.toThrow('Template mismatch')
 })
 
-test('падает до любых правок, если в папке языка есть страница вне списка', async () => {
+test('падает до любых правок, если в папке языка есть лишняя страница', async () => {
   await writeFile(join(dir, 'apps/docs/th/faq.md'), '# faq\n')
-  await expect(keepDocsLanguage(dir, 'en')).rejects.toThrow('apps/docs/th has faq.md, guide, index.md')
+  await expect(keepDocsLanguage(dir, 'en')).rejects.toThrow('apps/docs/th differs from ru: missing —, extra faq.md')
   // Ничего не тронуто: конфиг и папки языков на месте.
   expect(await readDocs('.vitepress/config.ts')).toContain('[ru, en, th]')
   expect(existsSync(join(dir, 'apps/docs/en'))).toBe(true)
+})
+
+test('падает, если у русской страницы нет перевода', async () => {
+  await mkdir(join(dir, 'apps/docs/guide/deep'), { recursive: true })
+  await writeFile(join(dir, 'apps/docs/guide/deep/page.md'), '# ru\n')
+  await expect(keepDocsLanguage(dir, 'en')).rejects.toThrow('apps/docs/en differs from ru: missing guide/deep/page.md, extra —')
 })

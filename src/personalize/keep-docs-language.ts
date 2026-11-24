@@ -1,5 +1,5 @@
-import { readdir, rename, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { readdir, rename, rm, stat } from 'node:fs/promises'
+import { join, relative } from 'node:path'
 import { type Locale, locales } from '../i18n.ts'
 import { editFile, removeOnce, replaceLinks, replaceOnce } from './edit-text.ts'
 
@@ -15,6 +15,24 @@ const DOCS_ROOT_LOCALE: Locale = 'ru'
  * в папке каждого языка; в корне — то же самое плюс служебные файлы.
  */
 const DOCS_PAGES = ['index.md', 'guide']
+
+/** Пути всех файлов внутри `entries` папки `folder`, отсортированные. */
+async function listPages(folder: string, entries: string[]): Promise<string[]> {
+  const pages: string[] = []
+  for (const entry of entries) {
+    const path = join(folder, entry)
+    if ((await stat(path)).isDirectory()) {
+      const files = await readdir(path, { recursive: true, withFileTypes: true })
+      for (const file of files) {
+        if (file.isFile()) pages.push(relative(folder, join(file.parentPath, file.name)))
+      }
+    }
+    else {
+      pages.push(entry)
+    }
+  }
+  return pages.sort()
+}
 
 /**
  * Оставляет документацию на одном языке и кладёт её в корень `apps/docs`:
@@ -32,15 +50,22 @@ export async function keepDocsLanguage(dir: string, locale: Locale): Promise<voi
   const vitepress = join(docs, '.vitepress')
   const others = locales.map(l => l.value).filter(value => value !== locale)
 
-  // 0. Сверка до любых правок: в папке каждого языка ровно DOCS_PAGES.
-  // Если шаблон добавит страницу (например en/faq.md), шаг 4 её не перенесёт,
-  // а шаг 5 удалит вместе с папкой. Поэтому генератор падает, и список
-  // нужно обновить вручную.
+  // 0. Сверка до любых правок: у каждого языка те же страницы, что у
+  // русского в корне, — сравниваются пути всех файлов. Иначе страница без
+  // перевода осталась бы в проекте по-русски, а лишняя страница в папке
+  // языка (например en/faq.md) пропала бы: шаг 4 переносит только
+  // DOCS_PAGES, а шаг 5 удаляет папку целиком. Генератор падает, разницу
+  // надо разобрать вручную.
+  const rootPages = await listPages(docs, DOCS_PAGES)
   for (const { value } of locales) {
     if (value === DOCS_ROOT_LOCALE) continue
-    const pages = (await readdir(join(docs, value))).sort()
-    if (pages.join() !== [...DOCS_PAGES].sort().join()) {
-      throw new Error(`Template mismatch: ${DOCS}/${value} has ${pages.join(', ')}, expected ${DOCS_PAGES.join(', ')}`)
+    const folder = join(docs, value)
+    const pages = await listPages(folder, await readdir(folder))
+    const missing = rootPages.filter(page => !pages.includes(page))
+    const extra = pages.filter(page => !rootPages.includes(page))
+    if (missing.length || extra.length) {
+      throw new Error(`Template mismatch: ${DOCS}/${value} differs from ${DOCS_ROOT_LOCALE}: `
+        + `missing ${missing.join(', ') || '—'}, extra ${extra.join(', ') || '—'}`)
     }
   }
 

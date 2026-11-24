@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /**
@@ -38,4 +38,25 @@ export async function writeDocs(dir: string): Promise<void> {
       '',
     ].join('\n'))
   }
+}
+
+/**
+ * Раздел для мейнтейнера, как в шаблоне: страница только в русской
+ * документации и своя группа в её сайдбаре. Отдельно от {@link writeDocs}:
+ * `keepDocsLanguage` получает документацию уже без него.
+ */
+export async function writeMaintainerDocs(dir: string): Promise<void> {
+  const docs = join(dir, 'apps/docs')
+  await mkdir(join(docs, 'guide/maintainer'), { recursive: true })
+  await writeFile(join(docs, 'guide/maintainer/index.md'), '# Ветки шаблона\n')
+  await appendFile(join(docs, '.vitepress/config/ru.ts'), [
+    `      {`,
+    `        text: 'Для мейнтейнера',`,
+    `        items: [`,
+    `          { text: 'Ветки шаблона', link: '/guide/maintainer/' },`,
+    `          { text: 'Релизы', link: '/guide/maintainer/release' },`,
+    `        ],`,
+    `      },`,
+    '',
+  ].join('\n'))
 }
