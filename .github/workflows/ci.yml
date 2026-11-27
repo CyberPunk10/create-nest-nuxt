@@ -1,21 +1,44 @@
 name: CI
 
+# Как устроен этот файл и почему проверки именно такие — ci.md рядом.
+
 on:
   # Push — только в main. Для остальных веток прогон даёт PR-триггер:
   # иначе на один и тот же код CI запускался бы дважды.
   push:
     branches: [main]
   pull_request:
+  # Шаблон меняется в своём репозитории, и его правки сами по себе CI
+  # генератора не запускают. Поэтому шаблон после успешного CI всех веток
+  # присылает событие template-updated (workflow notify-generator.yml в
+  # шаблоне), и генератор проверяется на свежих ветках шаблона.
+  repository_dispatch:
+    types: [template-updated]
+  workflow_dispatch:
+    inputs:
+      template_version:
+        description: Версия шаблона — branch (последнее состояние веток) или номер релиза, например 0.2.0
+        default: branch
 
-# Новый push в ту же ветку делает предыдущий прогон бессмысленным.
+# Какой шаблон скачивают e2e и job project. Пусто — тег TEMPLATE_VERSION
+# из src/variants.ts, тот же, что получит пользователь.
+env:
+  CNN_TEMPLATE_VERSION: ${{ github.event_name == 'repository_dispatch' && 'branch' || inputs.template_version || '' }}
+
+# Новый push в ту же ветку делает предыдущий прогон бессмысленным. Прогоны
+# по сигналу шаблона и ручные проверяют другой шаблон, поэтому push их не
+# отменяет.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # Сам генератор: typecheck, unit-тесты и e2e. Генератор запускается на Node
+  # пользователя через npx, а engines обещает работу на Node >=22, поэтому
+  # проверяется каждая актуальная мажорная версия.
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -24,20 +47,163 @@ jobs:
       matrix:
         node: [22, 24, 26]
     steps:
+      # 1. Скачать код генератора.
       - uses: actions/checkout@v7
 
-      # Node ставится первым, чтобы pnpm работал на версии из матрицы,
+      # 2. Поставить Node из матрицы. Первым, чтобы pnpm работал на этой версии,
       # а не на системном Node раннера.
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
 
-      # Версию pnpm берёт из packageManager в package.json.
+      # 3. Поставить pnpm. Версию берёт из packageManager в package.json;
+      # cache — кэш хранилища пакетов между прогонами.
       - uses: pnpm/action-setup@v6
         with:
           cache: true
 
+      # 4. Установить зависимости строго по lockfile: если он не совпадает с
+      # package.json, установка падает, а не обновляет его.
       - run: pnpm install --frozen-lockfile
+
+      # 5. Проверить типы исходников и тестов.
       - run: pnpm typecheck
+
+      # 6. Unit-тесты и e2e (скачивание шаблона с GitHub и проверка результата).
       # Сборку dist перед тестами делает test/build.ts.
       - run: pnpm test
+
+  # Сгенерированный проект устанавливается и собирается — то, что сделает
+  # пользователь сразу после create-nest-nuxt. Docker и dev-режим не
+  # проверяются: это делает CI самого шаблона.
+  #
+  # 9 сочетаний (3 варианта × 3 языка). Варианты отличаются кодом, языки —
+  # только документацией (apps/docs), и на каждой ветке она своя. Поэтому:
+  # - у всех 9 — type-check и сборка документации: генератор правит её
+  #   конфиг под язык; сборка VitePress типы не проверяет, а падает только
+  #   на битых ссылках;
+  # - lint, type-check, build и test всего проекта — у трёх вариантов на
+  #   английском: от языка они не зависят (lint документацию не проверяет).
+  project:
+    # Подпись копии в списке job, например «project (auth-session, th)».
+    name: project (${{ matrix.variant }}, ${{ matrix.lang }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Упавшее сочетание не должно скрывать результат остальных.
+      fail-fast: false
+      matrix:
+        variant: [main, auth-session, postgres-prisma]
+        lang: [ru, en, th]
+    env:
+      # Полный прогон — только на английском; в шагах ниже это условие if.
+      FULL: ${{ matrix.lang == 'en' }}
+    steps:
+      # --- Генератор ---
+
+      # 1. Скачать код генератора в папку generator/. Проект потом создаётся
+      # рядом, в project/: action-setup читает packageManager только по пути
+      # внутри рабочей папки.
+      - uses: actions/checkout@v7
+        with:
+          path: generator
+
+      # 2. Поставить Node для сборки генератора.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # 3. Поставить pnpm генератора — его версия может отличаться от версии
+      # проекта.
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: generator/package.json
+          cache: true
+          cache_dependency_path: generator/pnpm-lock.yaml
+
+      # 4. Собрать dist/index.mjs — тот же файл, который получает пользователь
+      # из npm.
+      - name: Build generator
+        working-directory: generator
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # 5. Создать проект так же, как пользователь, только ответы —
+      # в аргументах. Версию шаблона задаёт CNN_TEMPLATE_VERSION из env
+      # в начале файла.
+      - name: Generate project
+        run: node generator/dist/index.mjs project --variant ${{ matrix.variant }} --lang ${{ matrix.lang }}
+
+      # --- Проект: окружение как у пользователя ---
+
+      # 6. Поставить Node той версии, что закреплена в проекте.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: project/.nvmrc
+
+      # 7. Поставить pnpm проекта. dest — отдельная папка, чтобы не смешаться
+      # с pnpm генератора.
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: project/package.json
+          dest: ~/setup-pnpm-project
+          cache: true
+          cache_dependency_path: project/pnpm-lock.yaml
+
+      # 8. Установить зависимости проекта строго по его lockfile.
+      - name: Install
+        working-directory: project
+        run: pnpm install --frozen-lockfile
+
+      # 9. Создать .env из .env.example. Без них документация не соберётся:
+      # адрес кабинета берётся из apps/docs/.env.
+      - name: Copy .env
+        working-directory: project
+        run: pnpm env:copy
+
+      # --- Все языки, кроме en: только документация ---
+      # В полном прогоне то же самое делают type-check и build всего проекта.
+
+      # 10. Проверить типы конфига VitePress, который генератор правит под язык.
+      - name: Docs type-check
+        if: env.FULL != 'true'
+        working-directory: project
+        run: pnpm --filter @repo/docs type-check
+
+      # 11. Собрать документацию: VitePress падает на битых ссылках.
+      - name: Build docs
+        if: env.FULL != 'true'
+        working-directory: project
+        run: pnpm --filter @repo/docs build
+
+      # --- en: полный прогон ---
+
+      # 12. Lint. Скрипты lint запускаются с --fix и молча исправили бы
+      # ошибки. Проект — ещё не git-репозиторий, поэтому исходное состояние
+      # фиксируется в индексе, а исправленное линтером считается провалом.
+      - name: Lint
+        if: env.FULL == 'true'
+        working-directory: project
+        run: |
+          git init -q
+          git add -A
+          pnpm lint
+          git diff --exit-code
+
+      # 13. Проверить типы во всех пакетах, включая документацию.
+      - name: Type-check
+        if: env.FULL == 'true'
+        working-directory: project
+        run: pnpm type-check
+
+      # 14. Собрать все пакеты, включая документацию.
+      - name: Build
+        if: env.FULL == 'true'
+        working-directory: project
+        run: pnpm build
+
+      # 15. Тесты всех пакетов.
+      - name: Test
+        if: env.FULL == 'true'
+        working-directory: project
+        run: pnpm test
