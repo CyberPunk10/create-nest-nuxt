@@ -6,6 +6,7 @@ import { downloadTemplate } from 'giget'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { Locale } from '../src/i18n.ts'
 import { TEMPLATE_REPO, templateRef, type Variant } from '../src/variants.ts'
+import pkg from '../package.json' with { type: 'json' }
 import { run } from './cli.ts'
 
 // Полный проход: собранный CLI с ответами в аргументах скачивает настоящий
@@ -130,6 +131,15 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
     test.each(TEMPLATE_FIELDS)('в package.json есть поле %s', async (field) => {
       expect(await readJson(join(template, 'package.json'))).toHaveProperty(field)
     })
+
+    test('в паспорте проекта только часть шаблона: вариант своей ветки', async () => {
+      const { templateOrigin } = await readJson(join(template, 'package.json'))
+      expect(templateOrigin).toEqual({
+        variant,
+        repository: TEMPLATE_REPO,
+        baseVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+      })
+    })
   })
 
   test('завершается успешно и подсказывает cd в папку проекта', () => {
@@ -144,6 +154,22 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
     for (const field of TEMPLATE_FIELDS) {
       expect(pkg, field).not.toHaveProperty(field)
     }
+  })
+
+  // Часть шаблона переходит как есть, генератор дописывает свою: версию
+  // запущенного CLI, сегодняшнюю дату и выбранный язык.
+  test('паспорт проекта дополнен генератором', async () => {
+    const created = (await readJson(join(dir, 'package.json'))).templateOrigin
+    const original = (await readJson(join(template, 'package.json'))).templateOrigin
+    const now = new Date()
+    const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+      .map(n => String(n).padStart(2, '0')).join('-')
+    expect(created).toEqual({
+      ...original,
+      createdWith: `create-nest-nuxt@${pkg.version}`,
+      createdAt: today,
+      docsLanguage: lang,
+    })
   })
 
   // `nest new` записывает в package.json backend `"license": "UNLICENSED"` —

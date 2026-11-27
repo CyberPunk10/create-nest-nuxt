@@ -14,11 +14,12 @@ import { updatePackageJson } from './update-package-json.ts'
 /**
  * @param dir Папка со скачанным шаблоном.
  * @param projectName Имя пакета для поля `name`.
- * @param locale Язык, на котором остаётся документация.
+ * @param locale Язык, на котором остаётся документация; записывается и в
+ *   паспорт проекта (`templateOrigin` в package.json).
  */
 export async function personalize(dir: string, projectName: string, locale: Locale): Promise<void> {
   await removeTemplateFiles(dir)
   await removeMaintainerDocs(dir)
   await keepDocsLanguage(dir, locale)
-  await updatePackageJson(dir, projectName)
+  await updatePackageJson(dir, projectName, locale)
 }

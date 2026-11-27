@@ -16,7 +16,15 @@ vi.mock('giget', () => ({
     if (giget.offline) throw new Error('fetch failed')
     const { writeFile } = await import('node:fs/promises')
     const { join } = await import('node:path')
-    await writeFile(join(dir, 'package.json'), '{\n  "name": "template-nest-nuxt",\n  "license": "MIT"\n}\n')
+    await writeFile(join(dir, 'package.json'), `${JSON.stringify({
+      name: 'template-nest-nuxt',
+      license: 'MIT',
+      templateOrigin: {
+        variant: 'main',
+        repository: 'CyberPunk10/template-nest-nuxt',
+        baseVersion: '0.1.1',
+      },
+    }, null, 2)}\n`)
     await writeFile(join(dir, 'LICENSE'), 'template license')
     await writeFile(join(dir, 'README.md'), 'template readme')
     const { writeDocs, writeMaintainerDocs } = await import('./personalize/docs-fixture.ts')
@@ -117,7 +125,11 @@ test('шаблон персонализирован', async () => {
     locale: 'ru',
     overwrite: 'remove',
   }, messages)
-  expect(JSON.parse(await read('package.json'))).toEqual({ name: 'my-app', version: '0.0.0' })
+  expect(JSON.parse(await read('package.json'))).toMatchObject({
+    name: 'my-app',
+    version: '0.0.0',
+    templateOrigin: { variant: 'main', docsLanguage: 'ru' },
+  })
 })
 
 test('несуществующая папка создаётся', async () => {
