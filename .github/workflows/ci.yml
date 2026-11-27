@@ -73,17 +73,13 @@ jobs:
       # Сборку dist перед тестами делает test/build.ts.
       - run: pnpm test
 
-  # Сгенерированный проект устанавливается и собирается — то, что сделает
-  # пользователь сразу после create-nest-nuxt. Docker и dev-режим не
-  # проверяются: это делает CI самого шаблона.
+  # Сгенерированный проект устанавливается, собирается и проходит тесты —
+  # то, что сделает пользователь сразу после create-nest-nuxt. Docker и
+  # dev-режим не проверяются: это делает CI самого шаблона.
   #
-  # 9 сочетаний (3 варианта × 3 языка). Варианты отличаются кодом, языки —
-  # только документацией (apps/docs), и на каждой ветке она своя. Поэтому:
-  # - у всех 9 — type-check и сборка документации: генератор правит её
-  #   конфиг под язык; сборка VitePress типы не проверяет, а падает только
-  #   на битых ссылках;
-  # - lint, type-check, build и test всего проекта — у трёх вариантов на
-  #   английском: от языка они не зависят (lint документацию не проверяет).
+  # 9 сочетаний (3 варианта × 3 языка), у каждого полная проверка. Варианты
+  # отличаются кодом, языки — документацией, и генератор правит её конфиг
+  # под язык. Копии идут параллельно, так что время ожидания не растёт.
   project:
     # Подпись копии в списке job, например «project (auth-session, th)».
     name: project (${{ matrix.variant }}, ${{ matrix.lang }})
@@ -94,9 +90,6 @@ jobs:
       matrix:
         variant: [main, auth-session, postgres-prisma]
         lang: [ru, en, th]
-    env:
-      # Полный прогон — только на английском; в шагах ниже это условие if.
-      FULL: ${{ matrix.lang == 'en' }}
     steps:
       # --- Генератор ---
 
@@ -161,28 +154,12 @@ jobs:
         working-directory: project
         run: pnpm env:copy
 
-      # --- Все языки, кроме en: только документация ---
-      # В полном прогоне то же самое делают type-check и build всего проекта.
+      # --- Проверки ---
 
-      # 10. Проверить типы конфига VitePress, который генератор правит под язык.
-      - name: Docs type-check
-        if: env.FULL != 'true'
-        working-directory: project
-        run: pnpm --filter @repo/docs type-check
-
-      # 11. Собрать документацию: VitePress падает на битых ссылках.
-      - name: Build docs
-        if: env.FULL != 'true'
-        working-directory: project
-        run: pnpm --filter @repo/docs build
-
-      # --- en: полный прогон ---
-
-      # 12. Lint. Скрипты lint запускаются с --fix и молча исправили бы
+      # 10. Lint. Скрипты lint запускаются с --fix и молча исправили бы
       # ошибки. Проект — ещё не git-репозиторий, поэтому исходное состояние
       # фиксируется в индексе, а исправленное линтером считается провалом.
       - name: Lint
-        if: env.FULL == 'true'
         working-directory: project
         run: |
           git init -q
@@ -190,20 +167,18 @@ jobs:
           pnpm lint
           git diff --exit-code
 
-      # 13. Проверить типы во всех пакетах, включая документацию.
+      # 11. Проверить типы во всех пакетах, включая документацию.
       - name: Type-check
-        if: env.FULL == 'true'
         working-directory: project
         run: pnpm type-check
 
-      # 14. Собрать все пакеты, включая документацию.
+      # 12. Собрать все пакеты, включая документацию: VitePress падает на
+      # битых ссылках.
       - name: Build
-        if: env.FULL == 'true'
         working-directory: project
         run: pnpm build
 
-      # 15. Тесты всех пакетов.
+      # 13. Тесты всех пакетов.
       - name: Test
-        if: env.FULL == 'true'
         working-directory: project
         run: pnpm test
