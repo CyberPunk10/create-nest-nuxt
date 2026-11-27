@@ -70,6 +70,9 @@ const languageFiles = (code: string) => [`config/${code}.ts`, `locales/${code}.j
 /** Строка со списком языков в config.ts. */
 const localesLine = (codes: string) => `const LOCALES: LocaleEntry[] = [${codes}]`
 
+/** Поля корневого package.json, которые описывают шаблон и удаляются. */
+const TEMPLATE_FIELDS = ['author', 'license', 'keywords', 'description']
+
 async function readJson(path: string): Promise<Record<string, any>> {
   return JSON.parse(await readFile(path, 'utf8'))
 }
@@ -123,6 +126,10 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
     test('в сайдбаре русской документации есть раздел для мейнтейнера', async () => {
       expect(await readFile(join(template, VITEPRESS, 'config/ru.ts'), 'utf8')).toContain('/guide/maintainer/')
     })
+
+    test.each(TEMPLATE_FIELDS)('в package.json есть поле %s', async (field) => {
+      expect(await readJson(join(template, 'package.json'))).toHaveProperty(field)
+    })
   })
 
   test('завершается успешно и подсказывает cd в папку проекта', () => {
@@ -131,16 +138,18 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
     expect(result.stdout).toContain('cd my-app')
   })
 
-  test('package.json — проект пользователя, а не шаблон', async () => {
+  test(`package.json: имя проекта, версия 0.0.0, нет полей ${TEMPLATE_FIELDS.join(', ')}`, async () => {
     const pkg = await readJson(join(dir, 'package.json'))
     expect(pkg).toMatchObject({ name: 'my-app', version: '0.0.0' })
-    for (const field of ['author', 'license', 'keywords', 'description']) {
-      expect(pkg).not.toHaveProperty(field)
+    for (const field of TEMPLATE_FIELDS) {
+      expect(pkg, field).not.toHaveProperty(field)
     }
   })
 
   // `nest new` записывает в package.json backend `"license": "UNLICENSED"` —
   // «использовать запрещено», что противоречит лицензии самого проекта.
+  // Генератор backend не трогает: эти поля убраны в самом шаблоне, поэтому
+  // проверки «в шаблоне было» здесь нет — тест следит, чтобы они не вернулись.
   test('у backend нет полей автора и лицензии', async () => {
     const backend = await readJson(join(dir, 'apps/backend/package.json'))
     expect(backend).not.toHaveProperty('author')
