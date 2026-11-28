@@ -132,6 +132,13 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
       expect(await readJson(join(template, 'package.json'))).toHaveProperty(field)
     })
 
+    // Версия Node для разработки одна на оба репозитория: обновили в
+    // шаблоне — обновите и в генераторе.
+    test('.nvmrc совпадает с .nvmrc генератора', async () => {
+      const own = await readFile(join(import.meta.dirname, '..', '.nvmrc'), 'utf8')
+      expect(await readFile(join(template, '.nvmrc'), 'utf8')).toBe(own)
+    })
+
     test('в паспорте проекта только часть шаблона: вариант своей ветки', async () => {
       const { templateOrigin } = await readJson(join(template, 'package.json'))
       expect(templateOrigin).toEqual({
