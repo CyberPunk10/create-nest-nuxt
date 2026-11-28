@@ -139,6 +139,12 @@ describe.each(VARIANTS)('вариант $variant, язык $lang', ({ variant, l
       expect(await readFile(join(template, '.nvmrc'), 'utf8')).toBe(own)
     })
 
+    // Версия pnpm тоже одна на оба репозитория: CI ставит pnpm генератора
+    // и для созданного проекта.
+    test('packageManager совпадает с packageManager генератора', async () => {
+      expect((await readJson(join(template, 'package.json'))).packageManager).toBe(pkg.packageManager)
+    })
+
     test('в паспорте проекта только часть шаблона: вариант своей ветки', async () => {
       const { templateOrigin } = await readJson(join(template, 'package.json'))
       expect(templateOrigin).toEqual({

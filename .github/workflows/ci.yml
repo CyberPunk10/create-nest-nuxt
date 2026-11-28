@@ -101,14 +101,17 @@ jobs:
         with:
           path: generator
 
-      # 2. Поставить Node для сборки генератора — версию для разработки
-      # из его .nvmrc.
+      # 2. Поставить Node из .nvmrc генератора. Он тот же, что у проекта:
+      # e2e сверяет .nvmrc генератора и шаблона.
       - uses: actions/setup-node@v7
         with:
           node-version-file: generator/.nvmrc
 
-      # 3. Поставить pnpm генератора — его версия может отличаться от версии
-      # проекта.
+      # 3. Поставить pnpm из packageManager генератора — та же версия, что у
+      # проекта (тоже сверяется в e2e), поэтому один pnpm на весь job.
+      # Ключ кэша — lockfile генератора: проекта при установке ещё нет. Кэш
+      # сохраняется в конце job вместе с зависимостями проекта, но
+      # обновляется только при смене lockfile генератора.
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: generator/package.json
@@ -129,28 +132,14 @@ jobs:
       - name: Generate project
         run: node generator/dist/index.mjs project --variant ${{ matrix.variant }} --lang ${{ matrix.lang }}
 
-      # --- Проект: окружение как у пользователя ---
+      # --- Проект ---
 
-      # 6. Поставить Node той версии, что закреплена в проекте.
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: project/.nvmrc
-
-      # 7. Поставить pnpm проекта. dest — отдельная папка, чтобы не смешаться
-      # с pnpm генератора.
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: project/package.json
-          dest: ~/setup-pnpm-project
-          cache: true
-          cache_dependency_path: project/pnpm-lock.yaml
-
-      # 8. Установить зависимости проекта строго по его lockfile.
+      # 6. Установить зависимости проекта строго по его lockfile.
       - name: Install
         working-directory: project
         run: pnpm install --frozen-lockfile
 
-      # 9. Создать .env из .env.example. Без них документация не соберётся:
+      # 7. Создать .env из .env.example. Без них документация не соберётся:
       # адрес кабинета берётся из apps/docs/.env.
       - name: Copy .env
         working-directory: project
@@ -158,7 +147,7 @@ jobs:
 
       # --- Проверки ---
 
-      # 10. Lint. Скрипты lint запускаются с --fix и молча исправили бы
+      # 8. Lint. Скрипты lint запускаются с --fix и молча исправили бы
       # ошибки. Проект — ещё не git-репозиторий, поэтому исходное состояние
       # фиксируется в индексе, а исправленное линтером считается провалом.
       - name: Lint
@@ -169,18 +158,18 @@ jobs:
           pnpm lint
           git diff --exit-code
 
-      # 11. Проверить типы во всех пакетах, включая документацию.
+      # 9. Проверить типы во всех пакетах, включая документацию.
       - name: Type-check
         working-directory: project
         run: pnpm type-check
 
-      # 12. Собрать все пакеты, включая документацию: VitePress падает на
+      # 10. Собрать все пакеты, включая документацию: VitePress падает на
       # битых ссылках.
       - name: Build
         working-directory: project
         run: pnpm build
 
-      # 13. Тесты всех пакетов.
+      # 11. Тесты всех пакетов.
       - name: Test
         working-directory: project
         run: pnpm test
