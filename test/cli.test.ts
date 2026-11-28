@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import { describe, expect, test } from 'vitest'
 import pkg from '../package.json' with { type: 'json' }
 import { t } from '../src/i18n.ts'
@@ -32,6 +33,13 @@ describe('флаги без вопросов', () => {
   test('--version печатает версии генератора и шаблона, который он ставит', () => {
     expect(run(['--version'], ROOT, { CNN_TEMPLATE_VERSION: '' }))
       .toMatchObject({ status: 0, stdout: `${pkg.version} (template ${TEMPLATE_VERSION})\n` })
+  })
+
+  test('заголовок установки называет версии генератора и шаблона', () => {
+    // Без терминала генератор печатает заголовок и останавливается на первом
+    // вопросе — до скачивания и до создания папки.
+    const result = run(['my-app'], tmpdir(), { CNN_TEMPLATE_VERSION: '' })
+    expect(result.stdout).toContain(`create-nest-nuxt ${pkg.version} (template ${TEMPLATE_VERSION})`)
   })
 
   test('--version с CNN_TEMPLATE_VERSION показывает ту версию шаблона, что будет скачана', () => {

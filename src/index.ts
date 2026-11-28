@@ -42,7 +42,9 @@ async function main(): Promise<void> {
     return
   }
 
-  intro('create-nest-nuxt')
+  // Версии видны сразу: npx может взять старую версию генератора из своего
+  // кэша, а с ней и старый шаблон.
+  intro(`create-nest-nuxt ${pkg.version} (template ${templateVersion()})`)
 
   // Вопрос 1. «Language» — на английском, пропускается, если передан --lang
   const locale = await askLocale(args.lang)
