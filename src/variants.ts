@@ -23,7 +23,7 @@ export const TEMPLATE_REPO = 'CyberPunk10/template-nest-nuxt'
  * Чтобы пользователи получили новый релиз шаблона, эту константу поднимают
  * и выпускают новую версию генератора.
  */
-export const TEMPLATE_VERSION = '0.1.1'
+export const TEMPLATE_VERSION = '0.2.0'
 
 /** Версия шаблона, которую скачает генератор: {@link TEMPLATE_VERSION} или CNN_TEMPLATE_VERSION. */
 export function templateVersion(): string {
