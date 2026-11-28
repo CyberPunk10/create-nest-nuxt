@@ -14,7 +14,11 @@ export const BIN = pkg.bin['create-nest-nuxt']
  * CI, поэтому все ответы должны прийти аргументами. Свежую сборку делает
  * test/build.ts.
  */
-export function run(args: string[], cwd = ROOT) {
-  const { status, stdout, stderr } = spawnSync(`${ROOT}/${BIN}`, args, { cwd, encoding: 'utf8' })
+export function run(args: string[], cwd = ROOT, env: NodeJS.ProcessEnv = {}) {
+  const { status, stdout, stderr } = spawnSync(`${ROOT}/${BIN}`, args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  })
   return { status, stdout, stderr }
 }

@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { describe, expect, test } from 'vitest'
 import pkg from '../package.json' with { type: 'json' }
 import { t } from '../src/i18n.ts'
-import { variantValues } from '../src/variants.ts'
+import { TEMPLATE_VERSION, variantValues } from '../src/variants.ts'
 import { BIN, ROOT, run } from './cli.ts'
 
 // CLI как чёрный ящик, но без скачивания: состав пакета, флаги, ошибки.
@@ -29,8 +29,14 @@ describe('пакет', () => {
 })
 
 describe('флаги без вопросов', () => {
-  test('--version печатает версию из package.json', () => {
-    expect(run(['--version'])).toMatchObject({ status: 0, stdout: `${pkg.version}\n` })
+  test('--version печатает версии генератора и шаблона, который он ставит', () => {
+    expect(run(['--version'], ROOT, { CNN_TEMPLATE_VERSION: '' }))
+      .toMatchObject({ status: 0, stdout: `${pkg.version} (template ${TEMPLATE_VERSION})\n` })
+  })
+
+  test('--version с CNN_TEMPLATE_VERSION показывает ту версию шаблона, что будет скачана', () => {
+    expect(run(['--version'], ROOT, { CNN_TEMPLATE_VERSION: 'branch' }).stdout)
+      .toBe(`${pkg.version} (template branch)\n`)
   })
 
   test('--help печатает справку со всеми вариантами', () => {

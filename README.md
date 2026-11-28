@@ -67,7 +67,9 @@ It downloads a tested template release and turns it into your project:
   template version, generator version, creation date and docs language. The
   docs home page shows it.
 
-Each generator version installs one pinned template release, so
+The generator and the template have separate version numbers: each generator
+release installs one pinned template release, shown by `--version`
+(`0.3.0 (template 0.2.0)`). So
 `npx create-nest-nuxt@<version>` with the same answers always creates the same
 project.
 

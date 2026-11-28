@@ -24,6 +24,7 @@ import {
   confirmOverwrite,
 } from './prompts.ts'
 import { scaffold } from './scaffold.ts'
+import { templateVersion } from './variants.ts'
 
 /** Сценарий CLI: вопросы по порядку, затем скачивание и подсказка по запуску */
 async function main(): Promise<void> {
@@ -34,8 +35,10 @@ async function main(): Promise<void> {
     console.log(usage())
     return
   }
+  // Версии генератора и шаблона независимы: каждая версия генератора ставит
+  // свой закреплённый релиз шаблона, его и показываем рядом.
   if (args.version) {
-    console.log(pkg.version)
+    console.log(`${pkg.version} (template ${templateVersion()})`)
     return
   }
 

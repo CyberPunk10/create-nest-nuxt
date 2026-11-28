@@ -44,7 +44,7 @@ export function usage(): string {
     `  --lang <code>         ${locales.map(l => l.value).join(', ')}`,
     `  --overwrite <action>  ${OVERWRITE_ACTIONS.join(', ')} — if the folder is not empty`,
     '  -h, --help            show this help',
-    '  -v, --version         show version',
+    '  -v, --version         show the generator and template versions',
     '',
     'Without a terminal (CI, scripts) every answer must come from arguments.',
   ].join('\n')

@@ -25,6 +25,11 @@ export const TEMPLATE_REPO = 'CyberPunk10/template-nest-nuxt'
  */
 export const TEMPLATE_VERSION = '0.1.1'
 
+/** Версия шаблона, которую скачает генератор: {@link TEMPLATE_VERSION} или CNN_TEMPLATE_VERSION. */
+export function templateVersion(): string {
+  return process.env.CNN_TEMPLATE_VERSION || TEMPLATE_VERSION
+}
+
 /**
  * Что скачать для варианта: тег релиза (`auth-session@0.1.0`) или ветку
  * (`auth-session`) в её самом последнем состоянии.
@@ -35,10 +40,7 @@ export const TEMPLATE_VERSION = '0.1.1'
  *   шаблона можно проверить, что генератор работает с его новыми правками;
  * - `CNN_TEMPLATE_VERSION=0.2.0` — другой релиз шаблона.
  */
-export function templateRef(
-  variant: Variant,
-  version = process.env.CNN_TEMPLATE_VERSION || TEMPLATE_VERSION,
-): string {
+export function templateRef(variant: Variant, version = templateVersion()): string {
   return version === 'branch' ? variant : `${variant}@${version}`
 }
 
